@@ -7,7 +7,8 @@ class FSM {
         if(config){
             this._config = config;
             this._initial = this._config.initial;
-            this._previousState = null;
+            this._previousStates = [];
+            this._nextStates = [];
         } else {
             throw new TypeError("Invalid config");
         }
@@ -18,7 +19,7 @@ class FSM {
      * @returns {String}
      */
     getState() {
-        return this._config.initial;
+        return this._initial;
     }
 
     /**
@@ -27,8 +28,9 @@ class FSM {
      */
     changeState(state) {
         if(state in this._config.states){
-            this._previousState = this._config.initial;
-            this._config.initial = state;
+            this._previousStates.push(this._initial);
+            this._nextStates = [];
+            this._initial = state;
         } else {
             throw new TypeError("State doesn't exist");
         }
@@ -39,35 +41,24 @@ class FSM {
      * @param event
      */
     trigger(event) {
-        var states = this._config.states,
-        eventFound = false,
-        currentState,
-        transitions;
+        var transitions = this._config.states[this._initial].transitions;
 
-        this._previousState = this._config.initial;
-
-        for(var state in states){
-            currentState = states[state];
-            transitions = currentState.transitions;
-
-            for(var transition in transitions){
-                if(event == transition){
-                    this._config.initial = transitions[transition];
-                    eventFound = true;
-                }
-            }
+        if(transitions[event]){
+            this._previousStates.push(this._initial);
+            this._nextStates = [];
+            this._initial = transitions[event];
+        } else {
+            throw new Error();
         }
 
-        if(!eventFound){
-            throw new Error("Event doesn't exist");
-        }
     }
+
 
     /**
      * Resets FSM state to initial.
      */
     reset() {
-        this._config.initial = this._initial
+        this._initial = this._config.initial;
     }
 
     /**
@@ -82,9 +73,12 @@ class FSM {
         transitions,
         result = [];
 
+        if(!event){
+            return Object.keys(states);
+        }
+
         for(var state in states){
-            currentState = states[state];
-            transitions = currentState.transitions;
+            transitions = states[state].transitions;
 
             for(var transition in transitions){
                 if(event == transition){
@@ -93,9 +87,6 @@ class FSM {
             }
         }
 
-        if(!event){
-            result = Object.keys(states);
-        }
         return result;
     }
 
@@ -105,8 +96,9 @@ class FSM {
      * @returns {Boolean}
      */
     undo() {
-        if(this._previousState){
-            this._config.initial = this._previousState;
+        if(this._previousStates.length > 0){
+            this._nextStates.push(this._initial);
+            this._initial = this._previousStates.pop();
             return true;
         } else {
             return false;
@@ -118,12 +110,23 @@ class FSM {
      * Returns false if redo is not available.
      * @returns {Boolean}
      */
-    redo() {}
+    redo() {
+        if(this._nextStates.length > 0){
+            this._previousStates.push(this._initial);
+            this._initial = this._nextStates.pop();
+            return true;
+        } else {
+            return false;
+        }
+    }
 
     /**
      * Clears transition history
      */
-    clearHistory() {}
+    clearHistory() {
+        this._previousStates = [];
+        this._nextStates = [];
+    }
 }
 
 module.exports = FSM;
